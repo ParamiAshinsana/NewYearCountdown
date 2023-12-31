@@ -47,9 +47,9 @@
             margin: 0 auto;
         }
         .main__title{
-            letter-spacing: 1px;
-            color: #eee;
-            font-size: 95px;
+            letter-spacing: 5px;
+            color: #000;
+            font-size: 105px;
             font-weight: 900;
         }
         .main__title span{
@@ -76,5 +76,252 @@
 </div>
 
 <script src="assets/lib/jquery.min.js"></script>
+<script>
+    class Countdown{
+        constructor({
+                        targetDate,
+                        onTick,
+                        onComplete,
+                    }){
+            this.targetDate = targetDate;
+            this.onTick = onTick;
+            this.onComplete = onComplete;
+            this.#tick();
+        }
+
+        start(){
+            this.interval = setInterval(this.#tick.bind(this), 500);
+        }
+
+        stop(){
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+
+        #tick(){
+            const date = new Date(Date.now());
+            const time = this.targetDate - date;
+
+            if (time > 0){
+                this.onTick(time);
+            }else{
+                this.stop();
+                this.onComplete();
+            }
+        }
+    }
+
+    class SnowFall{
+        constructor({
+                        ctx,
+                        width,
+                        height,
+                        particleAmount,
+                        particleColor,
+                        particleMinSize,
+                        particleMaxSize,
+                        particleMinSpeed,
+                        particleMaxSpeed,
+                        particleMinLifetime,
+                        particleMaxLifetime,
+                        targetFPS = -1,
+                    }){
+            this.ctx = ctx;
+            this.width = width;
+            this.height = height;
+            this.particleAmount = particleAmount;
+            this.particleColor = particleColor;
+            this.particleMinSize = particleMinSize;
+            this.particleMaxSize = particleMaxSize;
+            this.particleMinSpeed = particleMinSpeed;
+            this.particleMaxSpeed = particleMaxSpeed;
+            this.particleMinLifetime = particleMinLifetime;
+            this.particleMaxLifetime = particleMaxLifetime;
+            this.updateInterval = targetFPS / 1000;
+            this.lastUpdateTime = 0;
+            this.updateTimer = 0;
+            this.animation = null;
+            this.createParticles();
+        }
+
+        random(min, max){
+            return min + (max - min) * Math.random();
+        }
+
+        setParticleOpitons(particle){
+            particle.x = Math.random() * this.width;
+            particle.y = this.random(-50, this.height - 50),
+                particle.color = this.particleColor;
+            particle.size = this.random(this.particleMinSize, this.particleMaxSize);
+            particle.sizeMultiply = 0;
+            particle.velocity = {
+                x: (Math.random() - 0.5) * 0.25 * this.random(this.particleMinSpeed, this.particleMaxSpeed),
+                y: 1 * this.random(this.particleMinSpeed, this.particleMaxSpeed),
+            };
+            particle.lifetime = this.random(this.particleMinLifetime, this.particleMaxLifetime);
+            particle.opacity = 1;
+
+            return particle;
+        }
+
+        createParticles(){
+            this.particles = [];
+
+            for (let i = 0; i < this.particleAmount; i++){
+                const particle = this.setParticleOpitons({});
+                this.particles.push(particle);
+            }
+        }
+
+        hexToRgb(hex, opacity) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+
+            const rgba = {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+                a: opacity
+            };
+
+            return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a})`;
+        }
+
+        update(deltaTime){
+            for (let i = 0; i < this.particleAmount; i++){
+                const particle = this.particles[i];
+
+                particle.x += particle.velocity.x;
+                particle.y += particle.velocity.y;
+                particle.lifetime -= deltaTime / 1000;
+
+                if (particle.sizeMultiply < 1){
+                    particle.sizeMultiply += deltaTime / 100;
+                }
+
+                if (particle.lifetime < 0.25){
+                    particle.opacity -= deltaTime / 250;
+
+                    if (particle.opacity < 0){
+                        particle.opacity = 0;
+                    }
+
+                    particle.color = this.hexToRgb(this.particleColor, particle.opacity);
+                }
+
+                if (particle.lifetime <= 0){
+                    this.setParticleOpitons(particle);
+                    this.particles[i] = particle;
+                }
+
+                this.ctx.beginPath();
+                this.ctx.fillStyle = particle.color;
+                this.ctx.arc(particle.x, particle.y, particle.size * particle.sizeMultiply, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+        }
+
+        animate(timeStamp = 0){
+            const deltaTime = timeStamp - this.lastUpdateTime;
+            this.lastUpdateTime = timeStamp;
+
+            if (this.updateTimer > this.updateInterval){
+                this.ctx.clearRect(0, 0, this.width, this.height);
+                this.update(deltaTime);
+                this.updateTimer = 0;
+            }else{
+                this.updateTimer += deltaTime;
+            }
+
+            this.animation = requestAnimationFrame(this.animate.bind(this));
+        }
+
+        resize(width, height){
+            this.width = width;
+            this.height = height;
+            this.cancelAnimation();
+            this.createParticles();
+            this.animate();
+        }
+
+        cancelAnimation(){
+            if (this.animation == null){
+                return;
+            }
+
+            cancelAnimationFrame(this.animation);
+            this.animation = null;
+        }
+    }
+
+    function getTargetDate(){
+        const date = new Date(Date.now());
+        return new Date(date.getFullYear() + 1, 0, 1);
+    }
+
+    function onTick(time){
+        function format(number, length){
+            let t = `${Math.floor(number)}`;
+            return t.padStart(length, '0');
+        }
+
+        function wrapSpan(innerText){
+            return `<span>${innerText}</span>`
+        }
+
+        const year = time / 1000 / 60 / 60 / 24,
+            hours = time / 1000 / 60 / 60 % 24,
+            minutes = time / 1000 / 60 % 60,
+            seconds = time / 1000 % 60;
+
+        document.querySelector('.main__title').innerHTML =
+            `${format(year, 3)}${wrapSpan('d')}:${format(hours, 2)}${wrapSpan('h')}:${format(minutes, 2)}${wrapSpan('m')}:${format(seconds, 2)}${wrapSpan('s')}`;
+    }
+
+    function onComplete(){
+        document.querySelector('.main__title').innerHTML = 'Happy New Year!';
+    }
+
+    const newYearCountdown = new Countdown({
+        targetDate: getTargetDate(),
+        onTick: onTick,
+        onComplete: onComplete
+    });
+    const canvas = document.querySelector('.cv');
+    const snowFallParticle = new SnowFall({
+        ctx: canvas.getContext('2d'),
+        width: window.innerWidth,
+        height: window.innerHeight,
+        particleAmount: 512,
+        particleColor: '#EAFDFC',
+        particleMinSize: 1,
+        particleMaxSize: 2.5,
+        particleMinSpeed: 1,
+        particleMaxSpeed: 3,
+        particleMinLifetime: 1.2,
+        particleMaxLifetime: 2.5,
+        targetFPS: 60,
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.ibg').forEach((e) => {
+            const img = e.querySelector('img');
+            e.style.backgroundImage = `url('${img.src}')`;
+        });
+
+        newYearCountdown.start();
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        snowFallParticle.animate();
+    });
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        snowFallParticle.resize(window.innerWidth, window.innerHeight);
+    });
+</script>
 </body>
 </html>
